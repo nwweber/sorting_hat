@@ -107,3 +107,4 @@ def test_reads_course_capacity_file():
         'Tricky, Course, Name': 10,
     }
     assert capacities == expected
+

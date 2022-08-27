@@ -10,6 +10,7 @@ CourseCapacity: TypeAlias = Dict[str, int]
 
 EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = 'example_student_preferences.csv'
 EXAMPLE_COURSE_CAPACITY_FILENAME: str = 'example_course_capacity.csv'
+EXAMPLE_SOLUTION_FILENAME: str = 'example_assignment_solution.csv'
 
 
 def get_example_problem():
@@ -55,6 +56,13 @@ class CourseAssignmentVariables:
 
     def get_all(self) -> List[IntVar]:
         return self.variables["variable"].to_list()
+
+    def report_final_assignments(self, solver: cp_model.CpSolver) -> DataFrame:
+        solver_decisions: List[bool] = [
+            solver.Value(var) == 1
+            for var in self.variables['variable']
+        ]
+        return self.variables[solver_decisions][['student', 'course']].reset_index(drop=True)
 
 
 def generate_course_assignment_variables(
@@ -109,9 +117,14 @@ def solve_example_problem():
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         print(f"Minimum of objective function: {solver.ObjectiveValue()}\n")
-        all_assignments: List[IntVar] = assignment_variables.get_all()
-        for assignment in all_assignments:
+        all_assignment_variables: List[IntVar] = assignment_variables.get_all()
+        for assignment in all_assignment_variables:
             print(f"{assignment} = {solver.Value(assignment)}")
+        final_assignment_report: DataFrame = assignment_variables.report_final_assignments(solver)
+        print('Found this assignment of students to courses:')
+        print(final_assignment_report)
+        final_assignment_report.to_csv(EXAMPLE_SOLUTION_FILENAME, index=False)
+        print(f'Saved this solution in {EXAMPLE_SOLUTION_FILENAME}')
     else:
         print("No solution found.")
 

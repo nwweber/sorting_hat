@@ -1,14 +1,15 @@
+from pathlib import Path
 from typing import Dict, List
 
 import sorting_hat
-from sorting_hat import StudentPreferences, CourseMaxStudents, CourseAssignmentVariables
+from sorting_hat import StudentPreferences, CourseCapacity, CourseAssignmentVariables
 from ortools.sat.python import cp_model
 from ortools.sat.python.cp_model import IntVar, BoundedLinearExpression
 
 
 def test_has_example_problem():
     student_course_preferences: StudentPreferences
-    course_max_nr_students: CourseMaxStudents
+    course_max_nr_students: CourseCapacity
     student_course_preferences, course_max_nr_students = sorting_hat.get_example_problem()
     assert len(student_course_preferences) > 0
     assert len(course_max_nr_students) > 0
@@ -18,7 +19,7 @@ def test_creates_assignment_variables():
     students: StudentPreferences = {
         'alice': ['course_1'],
     }
-    courses: CourseMaxStudents = {
+    courses: CourseCapacity = {
         'course_1': 1,
         'course_2': 1,
     }
@@ -55,7 +56,7 @@ def test_makes_cost_expression():
     students: StudentPreferences = {
         'alice': ['course_1', 'course_2'],
     }
-    courses: CourseMaxStudents = {
+    courses: CourseCapacity = {
         'course_1': 1,
         'course_2': 1,
         'course_3': 1,
@@ -87,3 +88,22 @@ def test_gest_all_assignments():
     all_assignments: List[IntVar] = assignments.get_all()
     assert all_assignments == all_assignments_expected
 
+
+def test_reads_student_preference_file():
+    pref_file_path: Path = Path('student_preferences.csv')
+    preferences: StudentPreferences = sorting_hat.read_student_preferences_file(pref_file_path)
+    expected: StudentPreferences = {
+        'student_1': ['course_1', 'course_2', 'course_3'],
+        'student_2': ['Difficult, Name']
+    }
+    assert preferences == expected
+
+
+def test_reads_course_capacity_file():
+    capacity_file_path: Path = Path('course_capacity.csv')
+    capacities: CourseCapacity = sorting_hat.read_course_capacity_file(capacity_file_path)
+    expected: CourseCapacity = {
+        'course_1': 1,
+        'Tricky, Course, Name': 10,
+    }
+    assert capacities == expected

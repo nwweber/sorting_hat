@@ -12,14 +12,15 @@ CourseCapacity: TypeAlias = Dict[str, int]
 EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = "example_student_preferences.csv"
 EXAMPLE_COURSE_CAPACITY_FILENAME: str = "example_course_capacity.csv"
 EXAMPLE_SOLUTION_FILENAME: str = "example_assignment_solution.csv"
+EXAMPLE_FILE_ENCODING: str = 'utf-8'
 
 
 def get_example_problem():
     student_preferences: StudentPreferences = read_student_preferences_file(
-        Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME)
+        Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME), EXAMPLE_FILE_ENCODING
     )
     course_max_students: CourseCapacity = read_course_capacity_file(
-        Path(EXAMPLE_COURSE_CAPACITY_FILENAME)
+        Path(EXAMPLE_COURSE_CAPACITY_FILENAME), EXAMPLE_FILE_ENCODING
     )
     return student_preferences, course_max_students
 
@@ -80,6 +81,10 @@ def generate_course_assignment_variables(
 ) -> CourseAssignmentVariables:
     student_names: List[str] = list(students.keys())
     course_names: List[str] = list(courses.keys())
+    print('known students: ')
+    print(student_names)
+    print('known courses')
+    print(course_names)
     initial_variables: List[Tuple[str, str, cp_model.IntVar]] = [
         (
             student_name,
@@ -89,7 +94,11 @@ def generate_course_assignment_variables(
         for student_name in student_names
         for course_name in course_names
     ]
+    print('created these initial course assignment variables:')
+    print(initial_variables)
     assignments = CourseAssignmentVariables(initial_variables)
+    print('peeking into the created object:')
+    print(assignments.variables)
     return assignments
 
 
@@ -99,6 +108,7 @@ def solve_example_problem() -> None:
         Path(EXAMPLE_COURSE_CAPACITY_FILENAME),
         Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME),
         Path(EXAMPLE_SOLUTION_FILENAME),
+        EXAMPLE_FILE_ENCODING
     )
 
 
@@ -116,7 +126,7 @@ def generate_constraints_only_preferred_courses(
         non_preferred_assign_vars: List[
             IntVar
         ] = assignment_variables.get_by_student_name_and_courses(
-            student_name, non_preferred_courses
+            student_name, list(non_preferred_courses)
         )
         for av in non_preferred_assign_vars:
             only_preferred_courses_constraints.append(av == 0)
@@ -171,24 +181,24 @@ def generate_cost(
     return cost
 
 
-def read_student_preferences_file(pref_file_path: Path) -> StudentPreferences:
-    preferences: StudentPreferences = {}
-    with pref_file_path.open("r") as f:
-        pref_reader = csv.reader(f, delimiter=",", quotechar='"')
-        for row in pref_reader:
+def read_student_preferences_file(file_path: Path, encoding: str) -> StudentPreferences:
+    out: StudentPreferences = {}
+    with file_path.open("r", encoding=encoding) as f:
+        reader = csv.reader(f, delimiter=",", quotechar='"')
+        for row in reader:
             student, courses = row[0], row[1:]
-            preferences[student] = courses
-    return preferences
+            out[student] = courses
+    return out
 
 
-def read_course_capacity_file(capacity_file_path: Path) -> CourseCapacity:
-    capacities: CourseCapacity = {}
-    with capacity_file_path.open("r") as f:
-        capacity_reader = csv.reader(f, delimiter=",", quotechar='"')
-        for row in capacity_reader:
+def read_course_capacity_file(file_path: Path, encoding: str) -> CourseCapacity:
+    out: CourseCapacity = {}
+    with file_path.open("r", encoding=encoding) as f:
+        reader = csv.reader(f, delimiter=",", quotechar='"')
+        for row in reader:
             course, capacity = row[0], int(row[1])
-            capacities[course] = capacity
-    return capacities
+            out[course] = capacity
+    return out
 
 
 def solve(
@@ -238,10 +248,10 @@ def solve(
 
 
 def solve_from_and_to_files(
-    capacity_path: Path, student_path: Path, solution_path: Path
+    capacity_path: Path, student_path: Path, solution_path: Path, encoding: str
 ) -> None:
-    students: StudentPreferences = read_student_preferences_file(student_path)
-    courses: CourseCapacity = read_course_capacity_file(capacity_path)
+    students: StudentPreferences = read_student_preferences_file(student_path, encoding)
+    courses: CourseCapacity = read_course_capacity_file(capacity_path, encoding)
     solution: Union[None, DataFrame] = solve(students, courses)
     if solution is not None:
         solution.to_csv(solution_path, index=False)
@@ -253,17 +263,21 @@ def solve_from_and_to_files(
 @click.argument('capacity_file')
 @click.argument('student_file')
 @click.argument('solution_file')
-def solve_from_command_line_args(capacity_file: str, student_file: str, solution_file: str) -> None:
+@click.option('--encoding', help='check here for possible values: https://stackoverflow.com/a/25584253', default=None)
+def solve_from_command_line_args(capacity_file: str, student_file: str, solution_file: str, encoding: str) -> None:
     """
-    Read course capacities from CAPACITY_FILE, read student preferences from STUDENT FILE,
+    Read course capacities from CAPACITY_FILE, read student preferences from STUDENT_FILE,
     attempt to solve optimally and write output to SOLUTION_FILE (will be created if it does not exist).
+
+    Files are read/writen using character ENCODING if given. If omitted, whatever Python uses by default on your system
+    will be used. If you see some hickups due to 'cannot decode character' etc this might be  place to start looking.
 
     Input files should be CSV files. Output will be written as CSV as well.
     """
     cap_file: Path = Path(capacity_file)
     stud_file: Path = Path(student_file)
     sol_file: Path = Path(solution_file)
-    solve_from_and_to_files(cap_file, stud_file, sol_file)
+    solve_from_and_to_files(cap_file, stud_file, sol_file, encoding)
 
 
 if __name__ == '__main__':

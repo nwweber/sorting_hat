@@ -108,7 +108,9 @@ def test_reads_course_capacity_file():
     capacities: CourseCapacity = sorting_hat.read_course_capacity_file(capacity_file_path)
     expected: CourseCapacity = {
         'course_1': 1,
-        'Tricky, Course, Name': 10,
+        'course_2': 1,
+        'course_3': 1,
+        "Difficult, Course, With, Commas, Name": 10,
     }
     assert capacities == expected
 
@@ -131,3 +133,13 @@ def test_solves_problem():
     )
     solution: DataFrame = sorting_hat.solve(students, courses)
     assert_frame_equal(solution, expected_solution)
+
+
+def test_solves_from_file():
+    capacity_path: Path = Path('course_capacity.csv')
+    student_path: Path = Path('student_preferences.csv')
+    solution_path: Path = Path('test_solution.csv')
+    solution_path.unlink(missing_ok=True)
+    sorting_hat.solve_from_and_to_files(capacity_path, student_path, solution_path)
+    assert solution_path.is_file()
+

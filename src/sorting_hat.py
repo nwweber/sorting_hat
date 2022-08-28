@@ -8,14 +8,18 @@ from pandas import DataFrame
 StudentPreferences: TypeAlias = Dict[str, List[str]]
 CourseCapacity: TypeAlias = Dict[str, int]
 
-EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = 'example_student_preferences.csv'
-EXAMPLE_COURSE_CAPACITY_FILENAME: str = 'example_course_capacity.csv'
-EXAMPLE_SOLUTION_FILENAME: str = 'example_assignment_solution.csv'
+EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = "example_student_preferences.csv"
+EXAMPLE_COURSE_CAPACITY_FILENAME: str = "example_course_capacity.csv"
+EXAMPLE_SOLUTION_FILENAME: str = "example_assignment_solution.csv"
 
 
 def get_example_problem():
-    student_preferences: StudentPreferences = read_student_preferences_file(Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME))
-    course_max_students: CourseCapacity = read_course_capacity_file(Path(EXAMPLE_COURSE_CAPACITY_FILENAME))
+    student_preferences: StudentPreferences = read_student_preferences_file(
+        Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME)
+    )
+    course_max_students: CourseCapacity = read_course_capacity_file(
+        Path(EXAMPLE_COURSE_CAPACITY_FILENAME)
+    )
     return student_preferences, course_max_students
 
 
@@ -53,7 +57,9 @@ class CourseAssignmentVariables:
             & (self.variables["course"].isin(course_names))
         ]["variable"].to_list()
         if len(variables) == 0:
-            raise ValueError(f"no variables for student {student_name}, courses {course_names}")
+            raise ValueError(
+                f"no variables for student {student_name}, courses {course_names}"
+            )
         return variables
 
     def get_all(self) -> List[IntVar]:
@@ -61,10 +67,11 @@ class CourseAssignmentVariables:
 
     def report_final_assignments(self, solver: cp_model.CpSolver) -> DataFrame:
         solver_decisions: List[bool] = [
-            solver.Value(var) == 1
-            for var in self.variables['variable']
+            solver.Value(var) == 1 for var in self.variables["variable"]
         ]
-        return self.variables[solver_decisions][['student', 'course']].reset_index(drop=True)
+        return self.variables[solver_decisions][["student", "course"]].reset_index(
+            drop=True
+        )
 
 
 def generate_course_assignment_variables(
@@ -85,12 +92,13 @@ def generate_course_assignment_variables(
     return assignments
 
 
-def solve_example_problem():
+def solve_example_problem() -> None:
     # see for example: https://developers.google.com/optimization/cp/cp_example
-    student_preferences: StudentPreferences
-    course_max_students: CourseCapacity
-    student_preferences, course_max_students = get_example_problem()
-    solution: DataFrame = solve(student_preferences, course_max_students)
+    solve_from_and_to_files(
+        Path(EXAMPLE_COURSE_CAPACITY_FILENAME),
+        Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME),
+        Path(EXAMPLE_SOLUTION_FILENAME),
+    )
 
 
 def generate_constraints_only_preferred_courses(
@@ -164,8 +172,8 @@ def generate_cost(
 
 def read_student_preferences_file(pref_file_path: Path) -> StudentPreferences:
     preferences: StudentPreferences = {}
-    with pref_file_path.open('r') as f:
-        pref_reader = csv.reader(f, delimiter=',', quotechar='"')
+    with pref_file_path.open("r") as f:
+        pref_reader = csv.reader(f, delimiter=",", quotechar='"')
         for row in pref_reader:
             student, courses = row[0], row[1:]
             preferences[student] = courses
@@ -174,15 +182,17 @@ def read_student_preferences_file(pref_file_path: Path) -> StudentPreferences:
 
 def read_course_capacity_file(capacity_file_path: Path) -> CourseCapacity:
     capacities: CourseCapacity = {}
-    with capacity_file_path.open('r') as f:
-        capacity_reader = csv.reader(f, delimiter=',', quotechar='"')
+    with capacity_file_path.open("r") as f:
+        capacity_reader = csv.reader(f, delimiter=",", quotechar='"')
         for row in capacity_reader:
             course, capacity = row[0], int(row[1])
             capacities[course] = capacity
     return capacities
 
 
-def solve(students: StudentPreferences, courses: CourseCapacity) -> Union[DataFrame, None]:
+def solve(
+    students: StudentPreferences, courses: CourseCapacity
+) -> Union[DataFrame, None]:
     model = cp_model.CpModel()
     assignment_variables: CourseAssignmentVariables = generate_course_assignment_variables(
         students, courses, model
@@ -215,12 +225,24 @@ def solve(students: StudentPreferences, courses: CourseCapacity) -> Union[DataFr
         all_assignment_variables: List[IntVar] = assignment_variables.get_all()
         for assignment in all_assignment_variables:
             print(f"{assignment} = {solver.Value(assignment)}")
-        final_assignment_report: DataFrame = assignment_variables.report_final_assignments(solver)
-        print('Found this assignment of students to courses:')
+        final_assignment_report: DataFrame = assignment_variables.report_final_assignments(
+            solver
+        )
+        print("Found this assignment of students to courses:")
         print(final_assignment_report)
-        final_assignment_report.to_csv(EXAMPLE_SOLUTION_FILENAME, index=False)
-        print(f'Saved this solution in {EXAMPLE_SOLUTION_FILENAME}')
         return final_assignment_report
     else:
         print("No solution found.")
         return None
+
+
+def solve_from_and_to_files(
+    capacity_path: Path, student_path: Path, solution_path: Path
+) -> None:
+    students: StudentPreferences = read_student_preferences_file(student_path)
+    courses: CourseCapacity = read_course_capacity_file(capacity_path)
+    solution: Union[None, DataFrame] = solve(students, courses)
+    if solution is not None:
+        solution.to_csv(solution_path, index=False)
+        print(f"Saved solution to {solution_path}")
+    return None

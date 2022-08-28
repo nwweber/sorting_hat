@@ -1,6 +1,6 @@
 import csv
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, TypeAlias
+from typing import Any, Dict, List, Tuple, TypeAlias, Union
 from ortools.sat.python import cp_model
 from ortools.sat.python.cp_model import CpModel, IntVar, BoundedLinearExpression
 from pandas import DataFrame
@@ -11,6 +11,9 @@ CourseCapacity: TypeAlias = Dict[str, int]
 EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = 'example_student_preferences.csv'
 EXAMPLE_COURSE_CAPACITY_FILENAME: str = 'example_course_capacity.csv'
 EXAMPLE_SOLUTION_FILENAME: str = 'example_assignment_solution.csv'
+
+EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = 'preferences.csv'
+EXAMPLE_COURSE_CAPACITY_FILENAME: str = 'capacity.csv'
 
 
 def get_example_problem():
@@ -52,6 +55,8 @@ class CourseAssignmentVariables:
             (self.variables["student"] == student_name)
             & (self.variables["course"].isin(course_names))
         ]["variable"].to_list()
+        if len(variables) == 0:
+            raise ValueError(f"no variables for student {student_name}, courses {course_names}")
         return variables
 
     def get_all(self) -> List[IntVar]:
@@ -88,45 +93,7 @@ def solve_example_problem():
     student_preferences: StudentPreferences
     course_max_students: CourseCapacity
     student_preferences, course_max_students = get_example_problem()
-    model = cp_model.CpModel()
-    assignment_variables: CourseAssignmentVariables = generate_course_assignment_variables(
-        student_preferences, course_max_students, model
-    )
-
-    exactly_one_course_constraints = generate_constraints_exactly_one_course_per_student(
-        assignment_variables, student_preferences
-    )
-    max_students_per_course_constraints = generate_constraints_max_students_per_course(
-        assignment_variables, course_max_students
-    )
-    only_preferred_courses_constraints = generate_constraints_only_preferred_courses(
-        assignment_variables, course_max_students, student_preferences
-    )
-
-    all_constraints: List[
-        BoundedLinearExpression
-    ] = exactly_one_course_constraints + max_students_per_course_constraints + only_preferred_courses_constraints
-    for constraint in all_constraints:
-        model.Add(constraint)
-
-    total_cost = generate_cost(student_preferences, assignment_variables)
-    model.Minimize(total_cost)
-
-    solver = cp_model.CpSolver()
-    status = solver.Solve(model)
-
-    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-        print(f"Minimum of objective function: {solver.ObjectiveValue()}\n")
-        all_assignment_variables: List[IntVar] = assignment_variables.get_all()
-        for assignment in all_assignment_variables:
-            print(f"{assignment} = {solver.Value(assignment)}")
-        final_assignment_report: DataFrame = assignment_variables.report_final_assignments(solver)
-        print('Found this assignment of students to courses:')
-        print(final_assignment_report)
-        final_assignment_report.to_csv(EXAMPLE_SOLUTION_FILENAME, index=False)
-        print(f'Saved this solution in {EXAMPLE_SOLUTION_FILENAME}')
-    else:
-        print("No solution found.")
+    solution: DataFrame = solve(student_preferences, course_max_students)
 
 
 def generate_constraints_only_preferred_courses(
@@ -216,3 +183,47 @@ def read_course_capacity_file(capacity_file_path: Path) -> CourseCapacity:
             course, capacity = row[0], int(row[1])
             capacities[course] = capacity
     return capacities
+
+
+def solve(students: StudentPreferences, courses: CourseCapacity) -> Union[DataFrame, None]:
+    model = cp_model.CpModel()
+    assignment_variables: CourseAssignmentVariables = generate_course_assignment_variables(
+        students, courses, model
+    )
+
+    exactly_one_course_constraints = generate_constraints_exactly_one_course_per_student(
+        assignment_variables, students
+    )
+    max_students_per_course_constraints = generate_constraints_max_students_per_course(
+        assignment_variables, courses
+    )
+    only_preferred_courses_constraints = generate_constraints_only_preferred_courses(
+        assignment_variables, courses, students
+    )
+
+    all_constraints: List[
+        BoundedLinearExpression
+    ] = exactly_one_course_constraints + max_students_per_course_constraints + only_preferred_courses_constraints
+    for constraint in all_constraints:
+        model.Add(constraint)
+
+    total_cost = generate_cost(students, assignment_variables)
+    model.Minimize(total_cost)
+
+    solver = cp_model.CpSolver()
+    status = solver.Solve(model)
+
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        print(f"Minimum of objective function: {solver.ObjectiveValue()}\n")
+        all_assignment_variables: List[IntVar] = assignment_variables.get_all()
+        for assignment in all_assignment_variables:
+            print(f"{assignment} = {solver.Value(assignment)}")
+        final_assignment_report: DataFrame = assignment_variables.report_final_assignments(solver)
+        print('Found this assignment of students to courses:')
+        print(final_assignment_report)
+        final_assignment_report.to_csv(EXAMPLE_SOLUTION_FILENAME, index=False)
+        print(f'Saved this solution in {EXAMPLE_SOLUTION_FILENAME}')
+        return final_assignment_report
+    else:
+        print("No solution found.")
+        return None

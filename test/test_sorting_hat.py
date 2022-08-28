@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from pandas import DataFrame
+from pandas._testing import assert_frame_equal
 
 import sorting_hat
 from sorting_hat import StudentPreferences, CourseCapacity, CourseAssignmentVariables
@@ -112,13 +113,21 @@ def test_reads_course_capacity_file():
     assert capacities == expected
 
 
-# def test_solves_problem():
-#     students: StudentPreferences = {
-#         'alice': ['course_1',],
-#         'bob': ['course_2', ],
-#     }
-#     courses: CourseCapacity = {
-#         'course_1': 1,
-#         'course_2': 1,
-#     }
-#     expected_solution: DataFrame
+def test_solves_problem():
+    students: StudentPreferences = {
+        'alice': ['course_1',],
+        'bob': ['course_2', ],
+    }
+    courses: CourseCapacity = {
+        'course_1': 1,
+        'course_2': 1,
+    }
+    expected_solution: DataFrame = DataFrame(
+        data=[
+            ['alice', 'course_1'],
+            ['bob', 'course_2']
+        ],
+        columns=['student', 'course']
+    )
+    solution: DataFrame = sorting_hat.solve(students, courses)
+    assert_frame_equal(solution, expected_solution)

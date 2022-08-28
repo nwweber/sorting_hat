@@ -254,6 +254,10 @@ def solve_from_and_to_files(
 @click.argument('student_file')
 @click.argument('solution_file')
 def solve_from_command_line_args(capacity_file: str, student_file: str, solution_file: str) -> None:
+    """
+    Read course capacities from CAPACITY_FILE (CSV format), read student preferences from STUDENT FILE,
+    attempt to solve optimally and write output to SOLUTION_FILE
+    """
     cap_file: Path = Path(capacity_file)
     stud_file: Path = Path(student_file)
     sol_file: Path = Path(solution_file)

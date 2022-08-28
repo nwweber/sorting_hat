@@ -246,7 +246,7 @@ def solve_from_and_to_files(
     courses: CourseCapacity = read_course_capacity_file(capacity_path, encoding)
     solution: Union[None, DataFrame] = solve(students, courses)
     if solution is not None:
-        solution.to_csv(solution_path, index=False)
+        solution.to_csv(solution_path, index=False, encoding=encoding)
         print(f"Saved solution to {solution_path}")
     return None
 

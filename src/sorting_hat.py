@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple, TypeAlias, Union
 from ortools.sat.python import cp_model
 from ortools.sat.python.cp_model import CpModel, IntVar, BoundedLinearExpression
 from pandas import DataFrame
+import click
 
 StudentPreferences: TypeAlias = Dict[str, List[str]]
 CourseCapacity: TypeAlias = Dict[str, int]
@@ -246,3 +247,18 @@ def solve_from_and_to_files(
         solution.to_csv(solution_path, index=False)
         print(f"Saved solution to {solution_path}")
     return None
+
+
+@click.command()
+@click.argument('capacity_file')
+@click.argument('student_file')
+@click.argument('solution_file')
+def solve_from_command_line_args(capacity_file: str, student_file: str, solution_file: str) -> None:
+    cap_file: Path = Path(capacity_file)
+    stud_file: Path = Path(student_file)
+    sol_file: Path = Path(solution_file)
+    solve_from_and_to_files(cap_file, stud_file, sol_file)
+
+
+if __name__ == '__main__':
+    solve_from_command_line_args()

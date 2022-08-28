@@ -81,10 +81,6 @@ def generate_course_assignment_variables(
 ) -> CourseAssignmentVariables:
     student_names: List[str] = list(students.keys())
     course_names: List[str] = list(courses.keys())
-    print('known students: ')
-    print(student_names)
-    print('known courses')
-    print(course_names)
     initial_variables: List[Tuple[str, str, cp_model.IntVar]] = [
         (
             student_name,
@@ -94,11 +90,7 @@ def generate_course_assignment_variables(
         for student_name in student_names
         for course_name in course_names
     ]
-    print('created these initial course assignment variables:')
-    print(initial_variables)
     assignments = CourseAssignmentVariables(initial_variables)
-    print('peeking into the created object:')
-    print(assignments.variables)
     return assignments
 
 
@@ -271,6 +263,7 @@ def solve_from_command_line_args(capacity_file: str, student_file: str, solution
 
     Files are read/writen using character ENCODING if given. If omitted, whatever Python uses by default on your system
     will be used. If you see some hickups due to 'cannot decode character' etc this might be  place to start looking.
+    Have a look here for possible values for this option: https://stackoverflow.com/a/25584253
 
     Input files should be CSV files. Output will be written as CSV as well.
     """

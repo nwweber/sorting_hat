@@ -12,9 +12,6 @@ EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = 'example_student_preferences.csv'
 EXAMPLE_COURSE_CAPACITY_FILENAME: str = 'example_course_capacity.csv'
 EXAMPLE_SOLUTION_FILENAME: str = 'example_assignment_solution.csv'
 
-EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = 'preferences.csv'
-EXAMPLE_COURSE_CAPACITY_FILENAME: str = 'capacity.csv'
-
 
 def get_example_problem():
     student_preferences: StudentPreferences = read_student_preferences_file(Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME))

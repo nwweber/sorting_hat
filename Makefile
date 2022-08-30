@@ -1,4 +1,4 @@
 .PHONY: test
 
 test:
-	PYTHONPATH=src pytest
+	cd test; PYTHONPATH=../src pytest

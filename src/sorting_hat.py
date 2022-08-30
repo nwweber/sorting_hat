@@ -173,7 +173,7 @@ def generate_cost(
     return cost
 
 
-def read_student_preferences_file(file_path: Path, encoding: str) -> StudentPreferences:
+def read_student_preferences_file(file_path: Path, encoding: Union[str, None]) -> StudentPreferences:
     out: StudentPreferences = {}
     with file_path.open("r", encoding=encoding) as f:
         reader = csv.reader(f, delimiter=",", quotechar='"')
@@ -183,7 +183,7 @@ def read_student_preferences_file(file_path: Path, encoding: str) -> StudentPref
     return out
 
 
-def read_course_capacity_file(file_path: Path, encoding: str) -> CourseCapacity:
+def read_course_capacity_file(file_path: Path, encoding: Union[str, None]) -> CourseCapacity:
     out: CourseCapacity = {}
     with file_path.open("r", encoding=encoding) as f:
         reader = csv.reader(f, delimiter=",", quotechar='"')
@@ -240,7 +240,7 @@ def solve(
 
 
 def solve_from_and_to_files(
-    capacity_path: Path, student_path: Path, solution_path: Path, encoding: str
+    capacity_path: Path, student_path: Path, solution_path: Path, encoding: Union[str, None]
 ) -> None:
     students: StudentPreferences = read_student_preferences_file(student_path, encoding)
     courses: CourseCapacity = read_course_capacity_file(capacity_path, encoding)

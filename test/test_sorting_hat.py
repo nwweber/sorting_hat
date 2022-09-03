@@ -172,3 +172,8 @@ def courses(course_info: DataFrame) -> Courses:
 
 def test_gets_max_students_by_course_name(courses):
     assert courses.get_max_students_by_course_name('course_1') == 1
+
+
+def test_raises_exception_when_making_courses_with_incorrect_field_names():
+    with pytest.raises(ValueError) as e_info:
+        _ = Courses(DataFrame([{'non_existent_field': 1}]))

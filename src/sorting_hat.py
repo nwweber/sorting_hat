@@ -18,12 +18,16 @@ EXAMPLE_FILE_ENCODING: str = 'utf-8'
 
 
 class Courses:
+    valid_fields: List[str] = ['name', 'min_size', 'max_size']
+
     @classmethod
     def make_from_file(cls, file_path: Path, encoding: Union[str, None]) -> Courses:
         course_info: DataFrame = pandas.read_csv(file_path, encoding=encoding)
         return Courses(course_info)
 
     def __init__(self, course_info: DataFrame):
+        if not set(self.valid_fields) == set(course_info.columns):
+            raise ValueError(f"expected fields {self.valid_fields} but received {course_info.columns}")
         self.course_info: DataFrame = course_info
 
     def __len__(self) -> int:

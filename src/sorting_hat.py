@@ -1,13 +1,15 @@
+from __future__ import annotations
 import csv
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, TypeAlias, Union
+
+import pandas
 from ortools.sat.python import cp_model
 from ortools.sat.python.cp_model import CpModel, IntVar, BoundedLinearExpression
 from pandas import DataFrame
 import click
 
 StudentPreferences: TypeAlias = Dict[str, List[str]]
-CourseCapacity: TypeAlias = Dict[str, int]
 
 EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = "example_student_preferences.csv"
 EXAMPLE_COURSE_CAPACITY_FILENAME: str = "example_course_capacity.csv"
@@ -15,11 +17,42 @@ EXAMPLE_SOLUTION_FILENAME: str = "example_assignment_solution.csv"
 EXAMPLE_FILE_ENCODING: str = 'utf-8'
 
 
+class Courses:
+    @classmethod
+    def make_from_file(cls, file_path: Path, encoding: Union[str, None]) -> Courses:
+        course_info: DataFrame = pandas.read_csv(file_path, encoding=encoding)
+        return Courses(course_info)
+
+    def __init__(self, course_info: DataFrame):
+        self.course_info: DataFrame = course_info
+
+    def __len__(self) -> int:
+        return len(self.course_info)
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, self.__class__):
+            return False
+        other: Courses
+        return self.course_info.equals(other.course_info)
+
+    def __str__(self):
+        return str(self.course_info)
+
+    def get_all_course_names(self) -> List[str]:
+        return self.course_info['name'].to_list()
+
+    def get_max_students_by_course_name(self, course_name: str) -> int:
+        records: DataFrame = self.course_info.query(f"name == '{course_name}'")
+        assert len(records) == 1, f"found {len(records)} entries for course {course_name}, expected exactly 1"
+        value: int = records['max_size'].squeeze()
+        return value
+
+
 def get_example_problem():
     student_preferences: StudentPreferences = read_student_preferences_file(
         Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME), EXAMPLE_FILE_ENCODING
     )
-    course_max_students: CourseCapacity = read_course_capacity_file(
+    course_max_students: Courses = Courses.make_from_file(
         Path(EXAMPLE_COURSE_CAPACITY_FILENAME), EXAMPLE_FILE_ENCODING
     )
     return student_preferences, course_max_students
@@ -77,10 +110,10 @@ class CourseAssignmentVariables:
 
 
 def generate_course_assignment_variables(
-    students: StudentPreferences, courses: CourseCapacity, model: CpModel
+    students: StudentPreferences, courses: Courses, model: CpModel
 ) -> CourseAssignmentVariables:
     student_names: List[str] = list(students.keys())
-    course_names: List[str] = list(courses.keys())
+    course_names: List[str] = courses.get_all_course_names()
     initial_variables: List[Tuple[str, str, cp_model.IntVar]] = [
         (
             student_name,
@@ -106,11 +139,11 @@ def solve_example_problem() -> None:
 
 def generate_constraints_only_preferred_courses(
     assignment_variables: CourseAssignmentVariables,
-    course_max_students: CourseCapacity,
+    course_max_students: Courses,
     student_preferences: StudentPreferences,
 ) -> List[BoundedLinearExpression]:
     only_preferred_courses_constraints: List[BoundedLinearExpression] = []
-    all_course_name_set: set = set(course_max_students.keys())
+    all_course_name_set: set = set(course_max_students.get_all_course_names())
     student_names: List[str] = list(student_preferences.keys())
     for student_name in student_names:
         student_preferred_course_set: set = set(student_preferences[student_name])
@@ -127,12 +160,12 @@ def generate_constraints_only_preferred_courses(
 
 def generate_constraints_max_students_per_course(
     assignment_variables: CourseAssignmentVariables,
-    course_max_students: CourseCapacity,
+    courses: Courses,
 ) -> List[BoundedLinearExpression]:
-    course_names: list[str] = list(course_max_students.keys())
+    course_names: list[str] = courses.get_all_course_names()
     max_students_per_course_constraints: List[BoundedLinearExpression] = []
     for course_name in course_names:
-        course_max_nr_students: int = course_max_students[course_name]
+        course_max_nr_students: int = courses.get_max_students_by_course_name(course_name)
         variables_for_course: List[IntVar] = assignment_variables.get_by_course_name(
             course_name
         )
@@ -183,18 +216,8 @@ def read_student_preferences_file(file_path: Path, encoding: Union[str, None]) -
     return out
 
 
-def read_course_capacity_file(file_path: Path, encoding: Union[str, None]) -> CourseCapacity:
-    out: CourseCapacity = {}
-    with file_path.open("r", encoding=encoding) as f:
-        reader = csv.reader(f, delimiter=",", quotechar='"')
-        for row in reader:
-            course, capacity = row[0], int(row[1])
-            out[course] = capacity
-    return out
-
-
 def solve(
-    students: StudentPreferences, courses: CourseCapacity
+    students: StudentPreferences, courses: Courses
 ) -> Union[DataFrame, None]:
     model = cp_model.CpModel()
     assignment_variables: CourseAssignmentVariables = generate_course_assignment_variables(
@@ -243,7 +266,7 @@ def solve_from_and_to_files(
     capacity_path: Path, student_path: Path, solution_path: Path, encoding: Union[str, None]
 ) -> None:
     students: StudentPreferences = read_student_preferences_file(student_path, encoding)
-    courses: CourseCapacity = read_course_capacity_file(capacity_path, encoding)
+    courses: Courses = Courses.make_from_file(capacity_path, encoding)
     solution: Union[None, DataFrame] = solve(students, courses)
     if solution is not None:
         solution.to_csv(solution_path, index=False, encoding=encoding)

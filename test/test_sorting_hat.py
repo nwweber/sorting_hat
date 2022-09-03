@@ -1,13 +1,20 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
+import pytest
+from ortools.sat.python import cp_model
+from ortools.sat.python.cp_model import BoundedLinearExpression, IntVar
 from pandas import DataFrame
-from pandas._testing import assert_frame_equal
+
+from pandas.testing import assert_frame_equal
 
 import sorting_hat
-from sorting_hat import StudentPreferences, CourseCapacity, CourseAssignmentVariables
-from ortools.sat.python import cp_model
-from ortools.sat.python.cp_model import IntVar, BoundedLinearExpression
+from sorting_hat import CourseAssignmentVariables, Courses, StudentPreferences
+
+
+@pytest.fixture
+def course_info():
+    return DataFrame([{"name": "course_1", "min_size": 0, "max_size": 1}])
 
 
 # unsure how to run test, breaks due to not finding example files at path given
@@ -23,10 +30,10 @@ def test_creates_assignment_variables():
     students: StudentPreferences = {
         "alice": ["course_1"],
     }
-    courses: CourseCapacity = {
-        "course_1": 1,
-        "course_2": 1,
-    }
+    courses: Courses = Courses(DataFrame([
+        {'name': 'course_1', 'min_size': 0, 'max_size': 1},
+        {'name': 'course_2', 'min_size': 0, 'max_size': 1},
+    ]))
     model = cp_model.CpModel()
     course_assignments: CourseAssignmentVariables = sorting_hat.generate_course_assignment_variables(
         students, courses, model
@@ -56,11 +63,11 @@ def test_makes_cost_expression():
     students: StudentPreferences = {
         "alice": ["course_1", "course_2"],
     }
-    courses: CourseCapacity = {
-        "course_1": 1,
-        "course_2": 1,
-        "course_3": 1,
-    }
+    courses: Courses = Courses(DataFrame([
+        {'name': 'course_1', 'min_size': 0, 'max_size': 1},
+        {'name': 'course_2', 'min_size': 0, 'max_size': 1},
+        {'name': 'course_3', 'min_size': 0, 'max_size': 1},
+    ]))
     model = cp_model.CpModel()
     course_assignments: CourseAssignmentVariables = sorting_hat.generate_course_assignment_variables(
         students, courses, model
@@ -103,15 +110,21 @@ def test_reads_student_preference_file():
 
 def test_reads_course_capacity_file():
     capacity_file_path: Path = Path("course_capacity.csv")
-    capacities: CourseCapacity = sorting_hat.read_course_capacity_file(
-        capacity_file_path, None
+    capacities: Courses = sorting_hat.Courses.make_from_file(capacity_file_path, None)
+    expected: Courses = Courses(
+        DataFrame(
+            [
+                {"name": "course_1", "min_size": 0, "max_size": 1},
+                {"name": "course_2", "min_size": 0, "max_size": 1},
+                {"name": "course_3", "min_size": 0, "max_size": 1},
+                {
+                    "name": "Difficult, Course, With, Commas, Name",
+                    "min_size": 0,
+                    "max_size": 10,
+                },
+            ]
+        )
     )
-    expected: CourseCapacity = {
-        "course_1": 1,
-        "course_2": 1,
-        "course_3": 1,
-        "Difficult, Course, With, Commas, Name": 10,
-    }
     assert capacities == expected
 
 
@@ -120,10 +133,10 @@ def test_solves_problem():
         "alice": ["course_1",],
         "bob": ["course_2",],
     }
-    courses: CourseCapacity = {
-        "course_1": 1,
-        "course_2": 1,
-    }
+    courses: Courses = Courses(DataFrame([
+        {'name': 'course_1', 'min_size': 0, 'max_size': 1},
+        {'name': 'course_2', 'min_size': 0, 'max_size': 1},
+    ]))
     expected_solution: DataFrame = DataFrame(
         data=[["alice", "course_1"], ["bob", "course_2"]], columns=["student", "course"]
     )
@@ -140,3 +153,22 @@ def test_solves_from_file():
         capacity_path, student_path, solution_path, encoding=None
     )
     assert solution_path.is_file()
+
+
+def test_makes_courses_from_dataframe(course_info):
+    courses: Courses = Courses(course_info)
+    assert len(courses) == 1
+
+
+def test_returns_course_names(course_info):
+    courses: Courses = Courses(course_info)
+    assert courses.get_all_course_names() == ["course_1"]
+
+
+@pytest.fixture()
+def courses(course_info: DataFrame) -> Courses:
+    return Courses(course_info)
+
+
+def test_gets_max_students_by_course_name(courses):
+    assert courses.get_max_students_by_course_name('course_1') == 1

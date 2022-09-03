@@ -1,4 +1,5 @@
-course_1,1
-course_2,1
-course_3,1
-"Difficult, Course, With, Commas, Name",10
+name,min_size,max_size
+course_1,0,1
+course_2,0,1
+course_3,0,1
+"Difficult, Course, With, Commas, Name",0,10

@@ -175,5 +175,11 @@ def test_gets_max_students_by_course_name(courses):
 
 
 def test_raises_exception_when_making_courses_with_incorrect_field_names():
-    with pytest.raises(ValueError) as e_info:
+    with pytest.raises(ValueError):
         _ = Courses(DataFrame([{'non_existent_field': 1}]))
+
+
+def test_gets_min_nr_students_by_course_name(courses: Courses):
+    result: int = courses.get_min_students_by_course_name('course_1')
+    assert result == 0
+

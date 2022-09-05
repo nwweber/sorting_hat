@@ -137,11 +137,11 @@ def test_solves_problem():
         {'name': 'course_1', 'min_size': 0, 'max_size': 1},
         {'name': 'course_2', 'min_size': 0, 'max_size': 1},
     ]))
-    expected_solution: DataFrame = DataFrame(
-        data=[["alice", "course_1"], ["bob", "course_2"]], columns=["student", "course"]
-    )
     solution: DataFrame = sorting_hat.solve(students, courses)
-    assert_frame_equal(solution, expected_solution)
+
+    assert all_courses_respect_min_nr_students()
+    assert all_courses_respect_max_nr_students()
+    assert all_students_assigned_to_a_preferred_course()
 
 
 def test_solves_from_file():

@@ -1,5 +1,6 @@
-"alchemy",2
-"sorcery",1
-"arithmancy",10
-"magical beasts",30
-"quidditch",30
+name,min_size,max_size
+"alchemy",0,2
+"sorcery",0,1
+"arithmancy",0,10
+"magical beasts",0,30
+"quidditch",4,30

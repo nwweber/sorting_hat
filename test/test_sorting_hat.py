@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import List
 
+import pandas
 import pytest
 from ortools.sat.python import cp_model
 from ortools.sat.python.cp_model import BoundedLinearExpression, IntVar
@@ -30,10 +31,14 @@ def test_creates_assignment_variables():
     students: StudentPreferences = {
         "alice": ["course_1"],
     }
-    courses: Courses = Courses(DataFrame([
-        {'name': 'course_1', 'min_size': 0, 'max_size': 1},
-        {'name': 'course_2', 'min_size': 0, 'max_size': 1},
-    ]))
+    courses: Courses = Courses(
+        DataFrame(
+            [
+                {"name": "course_1", "min_size": 0, "max_size": 1},
+                {"name": "course_2", "min_size": 0, "max_size": 1},
+            ]
+        )
+    )
     model = cp_model.CpModel()
     course_assignments: CourseAssignmentVariables = sorting_hat.generate_course_assignment_variables(
         students, courses, model
@@ -63,11 +68,15 @@ def test_makes_cost_expression():
     students: StudentPreferences = {
         "alice": ["course_1", "course_2"],
     }
-    courses: Courses = Courses(DataFrame([
-        {'name': 'course_1', 'min_size': 0, 'max_size': 1},
-        {'name': 'course_2', 'min_size': 0, 'max_size': 1},
-        {'name': 'course_3', 'min_size': 0, 'max_size': 1},
-    ]))
+    courses: Courses = Courses(
+        DataFrame(
+            [
+                {"name": "course_1", "min_size": 0, "max_size": 1},
+                {"name": "course_2", "min_size": 0, "max_size": 1},
+                {"name": "course_3", "min_size": 0, "max_size": 1},
+            ]
+        )
+    )
     model = cp_model.CpModel()
     course_assignments: CourseAssignmentVariables = sorting_hat.generate_course_assignment_variables(
         students, courses, model
@@ -128,20 +137,119 @@ def test_reads_course_capacity_file():
     assert capacities == expected
 
 
+def all_courses_respect_min_nr_students(solution: DataFrame, courses: Courses) -> bool:
+    student_counts_by_course: pandas.Series = solution.value_counts("course")
+    course: str
+    for course, student_count in student_counts_by_course.iteritems():
+        min_student_count: int = courses.get_min_students_by_course_name(course)
+        if student_count < min_student_count:
+            return False
+    return True
+
+
+def all_courses_respect_max_nr_students(solution: DataFrame, courses: Courses):
+    student_counts_by_course: pandas.Series = solution.value_counts("course")
+    course: str
+    for course, student_count in student_counts_by_course.iteritems():
+        max_student_count: int = courses.get_max_students_by_course_name(course)
+        if student_count > max_student_count:
+            return False
+    return True
+
+
+def test_all_courses_respect_min_nr_students():
+    courses = Courses(
+        DataFrame(
+            [
+                {"name": "c1", "min_size": 2, "max_size": 3},
+                {"name": "no_one_assigned_to_this", "min_size": 2, "max_size": 3},
+            ]
+        )
+    )
+    solution_fails: DataFrame = DataFrame(
+        [{"student": "alice", "course": "c1"},]
+    )
+    solution_passes: DataFrame = DataFrame(
+        [{"student": "alice", "course": "c1"}, {"student": "bob", "course": "c1"},]
+    )
+    assert not all_courses_respect_min_nr_students(solution_fails, courses)
+    assert all_courses_respect_min_nr_students(solution_passes, courses)
+
+
+def test_all_courses_respect_max_nr_students():
+    courses = Courses(
+        DataFrame(
+            [
+                {"name": "c1", "min_size": 2, "max_size": 3},
+                {"name": "no_one_assigned_to_this", "min_size": 2, "max_size": 3},
+            ]
+        )
+    )
+    solution_fails: DataFrame = DataFrame(
+        [
+            {"student": "alice", "course": "c1"},
+            {"student": "bob", "course": "c1"},
+            {"student": "charlie", "course": "c1"},
+            {"student": "dan", "course": "c1"},
+        ]
+    )
+    solution_passes: DataFrame = DataFrame(
+        [
+            {"student": "alice", "course": "c1"},
+            {"student": "bob", "course": "c1"},
+            {"student": "charlie", "course": "c1"},
+        ]
+    )
+    assert not all_courses_respect_max_nr_students(solution_fails, courses)
+    assert all_courses_respect_max_nr_students(solution_passes, courses)
+
+
+def all_students_assigned_to_a_preferred_course(solution: DataFrame, students: StudentPreferences):
+    student: str
+    preferred_courses: str
+    assignment_by_student: pandas.Series = solution.set_index('student')['course']
+    for student, preferred_courses in students.items():
+        assigned_course: str = assignment_by_student[student]
+        if assigned_course not in preferred_courses:
+            return False
+    return True
+
+
+def test_all_students_assigned_to_a_preferred_course():
+    students: StudentPreferences = {
+        'alice': ['gardening'],
+    }
+    solution_fails: DataFrame = DataFrame(
+        [
+            {"student": "alice", "course": "kite surfing"},
+        ]
+    )
+    solution_passes: DataFrame = DataFrame(
+        [
+            {"student": "alice", "course": "gardening"},
+        ]
+    )
+    assert not all_students_assigned_to_a_preferred_course(solution_fails, students)
+    assert all_students_assigned_to_a_preferred_course(solution_passes, students)
+
+
 def test_solves_problem():
     students: StudentPreferences = {
         "alice": ["course_1",],
         "bob": ["course_2",],
     }
-    courses: Courses = Courses(DataFrame([
-        {'name': 'course_1', 'min_size': 0, 'max_size': 1},
-        {'name': 'course_2', 'min_size': 0, 'max_size': 1},
-    ]))
+    courses: Courses = Courses(
+        DataFrame(
+            [
+                {"name": "course_1", "min_size": 0, "max_size": 1},
+                {"name": "course_2", "min_size": 0, "max_size": 1},
+            ]
+        )
+    )
     solution: DataFrame = sorting_hat.solve(students, courses)
-
-    assert all_courses_respect_min_nr_students()
-    assert all_courses_respect_max_nr_students()
-    assert all_students_assigned_to_a_preferred_course()
+    assert all_courses_respect_min_nr_students(solution, courses)
+    assert all_courses_respect_max_nr_students(solution, courses)
+    assert all_students_assigned_to_a_preferred_course(solution, students)
 
 
 def test_solves_from_file():
@@ -171,15 +279,14 @@ def courses(course_info: DataFrame) -> Courses:
 
 
 def test_gets_max_students_by_course_name(courses):
-    assert courses.get_max_students_by_course_name('course_1') == 1
+    assert courses.get_max_students_by_course_name("course_1") == 1
 
 
 def test_raises_exception_when_making_courses_with_incorrect_field_names():
     with pytest.raises(ValueError):
-        _ = Courses(DataFrame([{'non_existent_field': 1}]))
+        _ = Courses(DataFrame([{"non_existent_field": 1}]))
 
 
 def test_gets_min_nr_students_by_course_name(courses: Courses):
-    result: int = courses.get_min_students_by_course_name('course_1')
+    result: int = courses.get_min_students_by_course_name("course_1")
     assert result == 0
-

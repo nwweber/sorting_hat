@@ -329,10 +329,6 @@ def solve_from_command_line_args(
     solve_from_and_to_files(cap_file, stud_file, sol_file, encoding)
 
 
-if __name__ == "__main__":
-    solve_from_command_line_args()
-
-
 def add_constraints_to_model_min_nr_students(
     assignment_variables: CourseAssignmentVariables, courses: Courses, model: CpModel
 ) -> None:
@@ -353,3 +349,9 @@ def add_constraints_to_model_min_nr_students(
         # https://or.stackexchange.com/questions/4332/how-to-add-logical-or-constraint-in-or-tools
         model.Add(no_students).OnlyEnforceIf(either_or)
         model.Add(enough_students).OnlyEnforceIf(either_or)
+
+
+if __name__ == "__main__":
+    solve_from_command_line_args()
+
+

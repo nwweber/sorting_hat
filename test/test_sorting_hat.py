@@ -7,8 +7,6 @@ from ortools.sat.python import cp_model
 from ortools.sat.python.cp_model import BoundedLinearExpression, IntVar
 from pandas import DataFrame
 
-from pandas.testing import assert_frame_equal
-
 import sorting_hat
 from sorting_hat import CourseAssignmentVariables, Courses, StudentPreferences
 

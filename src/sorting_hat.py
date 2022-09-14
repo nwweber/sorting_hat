@@ -9,6 +9,12 @@ from ortools.sat.python.cp_model import CpModel, IntVar, BoundedLinearExpression
 from pandas import DataFrame
 import click
 
+STUDENT_NAME_CSV_COLUMN_NAME = 'name'
+
+PREFERENCES_CSV_COLUMN_NAME = 'preferences'
+
+COURSE_LIST_SPLITTING_SENTINEL = '@!@'
+
 StudentPreferences: TypeAlias = Dict[str, List[str]]
 
 EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = "example_student_preferences.csv"
@@ -228,12 +234,9 @@ def generate_cost(
 def read_student_preferences_file(
     file_path: Path, encoding: Union[str, None]
 ) -> StudentPreferences:
-    out: StudentPreferences = {}
-    with file_path.open("r", encoding=encoding) as f:
-        reader = csv.reader(f, delimiter=",", quotechar='"')
-        for row in reader:
-            student, courses = row[0], row[1:]
-            out[student] = courses
+    csv_data: DataFrame = pandas.read_csv(file_path, encoding=encoding)
+    csv_data['_preferences_as_list'] = csv_data[PREFERENCES_CSV_COLUMN_NAME].str.split(COURSE_LIST_SPLITTING_SENTINEL)
+    out: StudentPreferences = csv_data.set_index(STUDENT_NAME_CSV_COLUMN_NAME)['_preferences_as_list'].to_dict()
     return out
 
 

@@ -1,2 +1,3 @@
-student_1,course_1,course_2,course_3
-student_2,"Difficult, Course, With, Commas, Name"
+name,other_data,preferences
+student_1,some_data,"course_1@!@course_2@!@course_3"
+student_2,some_data,"Difficult, Course, With, Commas, Name"

@@ -25,6 +25,12 @@ class StudentsRegistry:
     def __len__(self) -> int:
         return len(self.students)
 
+    def __str__(self):
+        return str(self.students)
+
+    def __repr__(self):
+        return str(self)
+
     def all_student_registry_ids(self) -> List[int]:
         # note that these ids do not belong to the Student class. they are extrinsic
         # to the concept of Student and only get assigned once a Student gets added
@@ -64,6 +70,9 @@ class CourseRegistry:
 
     def __str__(self):
         return str(self.course_info)
+
+    def __repr__(self):
+        return str(self)
 
     def get_all_course_names(self) -> List[str]:
         return self.course_info["name"].to_list()
@@ -111,10 +120,9 @@ class CourseAssignmentVariables:
             other.variables[["student", "course"]]
         )
 
-    def get_by_student_name(self, name: str) -> List[cp_model.IntVar]:
-        student_vars: List[cp_model.IntVar] = self.variables.query(
-            f"student == '{name}'"
-        )["variable"].to_list()
+    def get_by_student_id(self, student_id: int) -> List[cp_model.IntVar]:
+        this_students_records: DataFrame = self.variables[self.variables['student'] == student_id]
+        student_vars: List[cp_model.IntVar] = this_students_records["variable"].to_list()
         return student_vars
 
     def get_by_course_name(self, name: str) -> List[IntVar]:
@@ -220,12 +228,12 @@ def generate_constraints_exactly_one_course_per_student(
     assignment_variables: CourseAssignmentVariables,
     student_preferences: StudentsRegistry,
 ) -> List[BoundedLinearExpression]:
-    student_names: list = list(student_preferences.all_student_registry_ids())
+    student_ids: list = list(student_preferences.all_student_registry_ids())
     exactly_one_course_constraints: List[BoundedLinearExpression] = []
-    for student_name in student_names:
+    for student_id in student_ids:
         variables_for_student: List[
             cp_model.IntVar
-        ] = assignment_variables.get_by_student_name(student_name)
+        ] = assignment_variables.get_by_student_id(student_id)
         constraint: BoundedLinearExpression = sum(variables_for_student) == 1
         exactly_one_course_constraints.append(constraint)
     return exactly_one_course_constraints
@@ -263,23 +271,20 @@ def solve(students: StudentsRegistry, courses: CourseRegistry) -> Union[DataFram
     assignment_variables: CourseAssignmentVariables = generate_course_assignment_variables(
         students, courses, model
     )
-
-    exactly_one_course_constraints = generate_constraints_exactly_one_course_per_student(
+    exactly_one_course_constraints: List[BoundedLinearExpression] = generate_constraints_exactly_one_course_per_student(
         assignment_variables, students
     )
-    max_students_per_course_constraints = generate_constraints_max_students_per_course(
+    max_students_per_course_constraints: List[BoundedLinearExpression] = generate_constraints_max_students_per_course(
         assignment_variables, courses
     )
-    only_preferred_courses_constraints = generate_constraints_only_preferred_courses(
+    only_preferred_courses_constraints: List[BoundedLinearExpression] = generate_constraints_only_preferred_courses(
         assignment_variables, courses, students
     )
-
     all_constraints: List[
         BoundedLinearExpression
     ] = exactly_one_course_constraints + max_students_per_course_constraints + only_preferred_courses_constraints
     for constraint in all_constraints:
         model.Add(constraint)
-
     # doesn't fit above schema of separating constraint creation and the actual addition to the model
     # reason: min nr students involves logical or operation, which is tricky to implement in ortools and
     # needs access to the actual model
@@ -379,3 +384,9 @@ if __name__ == "__main__":
 class Student:
     def __init__(self, preferences: List[str]):
         self.preferences: List[str] = preferences
+
+    def __str__(self):
+        return str(self.preferences)
+
+    def __repr__(self):
+        return str(self)

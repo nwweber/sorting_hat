@@ -1,35 +1,50 @@
 from __future__ import annotations
-import csv
-from pathlib import Path
-from typing import Any, Dict, List, Tuple, TypeAlias, Union
 
+from pathlib import Path
+from typing import Any, List, Tuple, Union
+
+import click
 import pandas
 from ortools.sat.python import cp_model
-from ortools.sat.python.cp_model import CpModel, IntVar, BoundedLinearExpression
+from ortools.sat.python.cp_model import BoundedLinearExpression, CpModel, IntVar
 from pandas import DataFrame
-import click
 
 STUDENT_NAME_CSV_COLUMN_NAME = 'name'
-
 PREFERENCES_CSV_COLUMN_NAME = 'preferences'
-
 COURSE_LIST_SPLITTING_SENTINEL = '@!@'
-
-StudentPreferences: TypeAlias = Dict[str, List[str]]
-
 EXAMPLE_STUDENT_PREFERENCES_FILENAME: str = "example_student_preferences.csv"
 EXAMPLE_COURSE_CAPACITY_FILENAME: str = "example_course_capacity.csv"
 EXAMPLE_SOLUTION_FILENAME: str = "example_assignment_solution.csv"
 EXAMPLE_FILE_ENCODING: str = "utf-8"
 
 
-class Courses:
+class StudentsRegistry:
+    def __init__(self, students: List[Student]):
+        self.students: List[Student] = students
+
+    def __len__(self) -> int:
+        return len(self.students)
+
+    def all_student_registry_ids(self) -> List[int]:
+        # note that these ids do not belong to the Student class. they are extrinsic
+        # to the concept of Student and only get assigned once a Student gets added
+        # to a Registry
+        return list(range(len(self.students)))
+
+    def all_student_ids_and_students(self) -> enumerate[Student]:
+        return enumerate(self.students)
+
+    def student_by_id(self, student_id: int) -> Student:
+        return self.students[student_id]
+
+
+class CourseRegistry:
     valid_fields: List[str] = ["name", "min_size", "max_size"]
 
     @classmethod
-    def make_from_file(cls, file_path: Path, encoding: Union[str, None]) -> Courses:
+    def make_from_file(cls, file_path: Path, encoding: Union[str, None]) -> CourseRegistry:
         course_info: DataFrame = pandas.read_csv(file_path, encoding=encoding)
-        return Courses(course_info)
+        return CourseRegistry(course_info)
 
     def __init__(self, course_info: DataFrame):
         if not set(self.valid_fields) == set(course_info.columns):
@@ -44,7 +59,7 @@ class Courses:
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, self.__class__):
             return False
-        other: Courses
+        other: CourseRegistry
         return self.course_info.equals(other.course_info)
 
     def __str__(self):
@@ -73,17 +88,17 @@ class Courses:
 
 
 def get_example_problem():
-    student_preferences: StudentPreferences = read_student_preferences_file(
+    student_preferences: StudentsRegistry = read_student_preferences_file(
         Path(EXAMPLE_STUDENT_PREFERENCES_FILENAME), EXAMPLE_FILE_ENCODING
     )
-    course_max_students: Courses = Courses.make_from_file(
+    course_max_students: CourseRegistry = CourseRegistry.make_from_file(
         Path(EXAMPLE_COURSE_CAPACITY_FILENAME), EXAMPLE_FILE_ENCODING
     )
     return student_preferences, course_max_students
 
 
 class CourseAssignmentVariables:
-    def __init__(self, initial_variables: List[Tuple[str, str, cp_model.IntVar]]):
+    def __init__(self, initial_variables: List[Tuple[int, str, cp_model.IntVar]]):
         self.variables: DataFrame = DataFrame(
             data=initial_variables, columns=["student", "course", "variable"]
         )
@@ -108,16 +123,16 @@ class CourseAssignmentVariables:
         )["variable"].to_list()
         return course_vars
 
-    def get_by_student_name_and_courses(
-        self, student_name: str, course_names: List[str]
+    def get_by_student_id_and_courses(
+        self, student_id: int, course_names: List[str]
     ):
         variables: List[IntVar] = self.variables[
-            (self.variables["student"] == student_name)
+            (self.variables["student"] == student_id)
             & (self.variables["course"].isin(course_names))
         ]["variable"].to_list()
         if len(variables) == 0:
             raise ValueError(
-                f"no variables for student {student_name}, courses {course_names}"
+                f"no variables for student {student_id}, courses {course_names}"
             )
         return variables
 
@@ -134,17 +149,17 @@ class CourseAssignmentVariables:
 
 
 def generate_course_assignment_variables(
-    students: StudentPreferences, courses: Courses, model: CpModel
+    students: StudentsRegistry, courses: CourseRegistry, model: CpModel
 ) -> CourseAssignmentVariables:
-    student_names: List[str] = list(students.keys())
+    student_ids: List[int] = list(students.all_student_registry_ids())
     course_names: List[str] = courses.get_all_course_names()
-    initial_variables: List[Tuple[str, str, cp_model.IntVar]] = [
+    initial_variables: List[Tuple[int, str, cp_model.IntVar]] = [
         (
-            student_name,
+            student_id,
             course_name,
-            model.NewBoolVar(f"{student_name} in {course_name}"),
+            model.NewBoolVar(f"{student_id} in {course_name}"),
         )
-        for student_name in student_names
+        for student_id in student_ids
         for course_name in course_names
     ]
     assignments = CourseAssignmentVariables(initial_variables)
@@ -163,19 +178,19 @@ def solve_example_problem() -> None:
 
 def generate_constraints_only_preferred_courses(
     assignment_variables: CourseAssignmentVariables,
-    course_max_students: Courses,
-    student_preferences: StudentPreferences,
+    course_max_students: CourseRegistry,
+    students_registry: StudentsRegistry,
 ) -> List[BoundedLinearExpression]:
     only_preferred_courses_constraints: List[BoundedLinearExpression] = []
     all_course_name_set: set = set(course_max_students.get_all_course_names())
-    student_names: List[str] = list(student_preferences.keys())
-    for student_name in student_names:
-        student_preferred_course_set: set = set(student_preferences[student_name])
+    student_ids: List[int] = list(students_registry.all_student_registry_ids())
+    for student_id in student_ids:
+        student_preferred_course_set: set = set(students_registry.student_by_id(student_id).preferences)
         non_preferred_courses: set = all_course_name_set - student_preferred_course_set
         non_preferred_assign_vars: List[
             IntVar
-        ] = assignment_variables.get_by_student_name_and_courses(
-            student_name, list(non_preferred_courses)
+        ] = assignment_variables.get_by_student_id_and_courses(
+            student_id, list(non_preferred_courses)
         )
         for av in non_preferred_assign_vars:
             only_preferred_courses_constraints.append(av == 0)
@@ -183,7 +198,7 @@ def generate_constraints_only_preferred_courses(
 
 
 def generate_constraints_max_students_per_course(
-    assignment_variables: CourseAssignmentVariables, courses: Courses,
+    assignment_variables: CourseAssignmentVariables, courses: CourseRegistry,
 ) -> List[BoundedLinearExpression]:
     course_names: list[str] = courses.get_all_course_names()
     max_students_per_course_constraints: List[BoundedLinearExpression] = []
@@ -203,9 +218,9 @@ def generate_constraints_max_students_per_course(
 
 def generate_constraints_exactly_one_course_per_student(
     assignment_variables: CourseAssignmentVariables,
-    student_preferences: StudentPreferences,
+    student_preferences: StudentsRegistry,
 ) -> List[BoundedLinearExpression]:
-    student_names: list = list(student_preferences.keys())
+    student_names: list = list(student_preferences.all_student_registry_ids())
     exactly_one_course_constraints: List[BoundedLinearExpression] = []
     for student_name in student_names:
         variables_for_student: List[
@@ -217,14 +232,15 @@ def generate_constraints_exactly_one_course_per_student(
 
 
 def generate_cost(
-    students: StudentPreferences, course_assignments: CourseAssignmentVariables
+    students: StudentsRegistry, course_assignments: CourseAssignmentVariables
 ) -> BoundedLinearExpression:
     cost_terms: List[BoundedLinearExpression] = []
-    for student_name, course_list in students.items():
+    for student_id, student in students.all_student_ids_and_students():
+        course_list: List[str] = student.preferences
         # note that courses in list are ordered by preference
         for preference_index, course in enumerate(course_list):
-            assign_var: IntVar = course_assignments.get_by_student_name_and_courses(
-                student_name, [course]
+            assign_var: IntVar = course_assignments.get_by_student_id_and_courses(
+                student_id, [course]
             )[0]
             cost_terms.append(preference_index * assign_var)
     cost: BoundedLinearExpression = sum(cost_terms)
@@ -233,14 +249,16 @@ def generate_cost(
 
 def read_student_preferences_file(
     file_path: Path, encoding: Union[str, None]
-) -> StudentPreferences:
+) -> StudentsRegistry:
     csv_data: DataFrame = pandas.read_csv(file_path, encoding=encoding)
     csv_data['_preferences_as_list'] = csv_data[PREFERENCES_CSV_COLUMN_NAME].str.split(COURSE_LIST_SPLITTING_SENTINEL)
-    out: StudentPreferences = csv_data.set_index(STUDENT_NAME_CSV_COLUMN_NAME)['_preferences_as_list'].to_dict()
-    return out
+    course_preferences = csv_data['_preferences_as_list'].to_list()
+    students: List[Student] = [Student(preferences=list_of_courses) for list_of_courses in course_preferences]
+    registry = StudentsRegistry(students)
+    return registry
 
 
-def solve(students: StudentPreferences, courses: Courses) -> Union[DataFrame, None]:
+def solve(students: StudentsRegistry, courses: CourseRegistry) -> Union[DataFrame, None]:
     model = cp_model.CpModel()
     assignment_variables: CourseAssignmentVariables = generate_course_assignment_variables(
         students, courses, model
@@ -295,8 +313,8 @@ def solve_from_and_to_files(
     solution_path: Path,
     encoding: Union[str, None],
 ) -> None:
-    students: StudentPreferences = read_student_preferences_file(student_path, encoding)
-    courses: Courses = Courses.make_from_file(capacity_path, encoding)
+    students: StudentsRegistry = read_student_preferences_file(student_path, encoding)
+    courses: CourseRegistry = CourseRegistry.make_from_file(capacity_path, encoding)
     solution: Union[None, DataFrame] = solve(students, courses)
     if solution is not None:
         solution.to_csv(solution_path, index=False, encoding=encoding)
@@ -333,7 +351,7 @@ def solve_from_command_line_args(
 
 
 def add_constraints_to_model_min_nr_students(
-    assignment_variables: CourseAssignmentVariables, courses: Courses, model: CpModel
+    assignment_variables: CourseAssignmentVariables, courses: CourseRegistry, model: CpModel
 ) -> None:
     course_names: list[str] = courses.get_all_course_names()
     for course_name in course_names:
@@ -358,3 +376,6 @@ if __name__ == "__main__":
     solve_from_command_line_args()
 
 
+class Student:
+    def __init__(self, preferences: List[str]):
+        self.preferences: List[str] = preferences

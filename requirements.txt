@@ -1,3 +1,4 @@
 click==8.0.4
 ortools==9.4.1874
 pandas==1.4.2
+pytest

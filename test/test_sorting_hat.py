@@ -8,7 +8,7 @@ from ortools.sat.python.cp_model import BoundedLinearExpression, IntVar
 from pandas import DataFrame
 
 import sorting_hat
-from sorting_hat import CourseAssignmentVariables, CourseRegistry, Student, StudentsRegistry
+from sorting_hat import CourseAssignmentVariables, CourseRegistry, Student, StudentRegistry
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def course_info():
 
 
 def test_creates_assignment_variables():
-    students: StudentsRegistry = StudentsRegistry([Student(preferences=["course_1"])])
+    students: StudentRegistry = StudentRegistry([Student(preferences=["course_1"])])
     courses: CourseRegistry = CourseRegistry(
         DataFrame(
             [
@@ -57,7 +57,7 @@ def test_gets_cp_variables_by_course_name():
 
 
 def test_makes_cost_expression():
-    students: StudentsRegistry = StudentsRegistry(
+    students: StudentRegistry = StudentRegistry(
         [Student(preferences=["course_1", "course_2"])]
     )
     courses: CourseRegistry = CourseRegistry(
@@ -99,7 +99,7 @@ def test_gets_all_assignments():
 
 def test_reads_student_preference_file():
     pref_file_path: Path = Path("student_preferences.csv")
-    student_registry: StudentsRegistry = sorting_hat.read_student_preferences_file(
+    student_registry: StudentRegistry = sorting_hat.read_student_preferences_file(
         pref_file_path, None
     )
     assert len(student_registry) > 0
@@ -193,10 +193,9 @@ def test_all_courses_respect_max_nr_students():
 
 
 def all_students_assigned_to_a_preferred_course(
-    solution: DataFrame, students: StudentsRegistry
+    solution: DataFrame, students: StudentRegistry
 ):
     student_id: int
-    preferred_courses: str
     student: Student
     assignment_by_student: pandas.Series = solution.set_index("student")["course"]
     for student_id, student in students.all_student_ids_and_students():
@@ -208,7 +207,7 @@ def all_students_assigned_to_a_preferred_course(
 
 
 def test_all_students_assigned_to_a_preferred_course():
-    students: StudentsRegistry = StudentsRegistry([Student(preferences=["gardening"])])
+    students: StudentRegistry = StudentRegistry([Student(preferences=["gardening"])])
     solution_fails: DataFrame = DataFrame(
         [{"student": 0, "course": "kite surfing"},]
     )
@@ -220,7 +219,7 @@ def test_all_students_assigned_to_a_preferred_course():
 
 
 def test_solves_problem():
-    students: StudentsRegistry = StudentsRegistry(
+    students: StudentRegistry = StudentRegistry(
         [Student(preferences=["course_1"]), Student(preferences=["course_2"]),]
     )
     courses: CourseRegistry = CourseRegistry(
@@ -279,7 +278,7 @@ def test_gets_min_nr_students_by_course_name(courses: CourseRegistry):
 
 
 def test_can_get_students_ids():
-    students: StudentsRegistry = StudentsRegistry(
+    students: StudentRegistry = StudentRegistry(
         [Student(preferences=["c1"]), Student(preferences=["c1"]),]
     )
     ids: List[int] = students.all_student_registry_ids()
@@ -294,13 +293,13 @@ def test_can_create_new_student():
 
 
 def test_student_registry_has_length():
-    registry: StudentsRegistry = StudentsRegistry([Student(preferences=["course_1"])])
+    registry: StudentRegistry = StudentRegistry([Student(preferences=["course_1"])])
     assert len(registry)
 
 
 def test_registry_can_produce_list_of_student_ids_and_preferences():
     students: List[Student] = [Student(preferences=["course_1"])]
-    registry = StudentsRegistry(students)
+    registry = StudentRegistry(students)
     student_ids_and_preferences = list(registry.all_student_ids_and_students())
     assert len(student_ids_and_preferences) == len(students)
     for student_id, student in student_ids_and_preferences:
@@ -310,7 +309,7 @@ def test_registry_can_produce_list_of_student_ids_and_preferences():
 
 def test_registry_gets_student_by_id():
     students: List[Student] = [Student(preferences=["course_1"])]
-    registry = StudentsRegistry(students)
+    registry = StudentRegistry(students)
     actual: Student = registry.student_by_id(0)
     expected: Student = students[0]
     assert actual == expected
